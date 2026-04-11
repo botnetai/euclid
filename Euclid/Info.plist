@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AudioHardwarePowerHint</key>
+	<string>None</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.7.3</string>
+	<key>CFBundleVersion</key>
+	<string>83</string>
+	<key>CFBundleDisplayName</key>
+	<string>Euclid</string>
+	<key>CFBundleName</key>
+	<string>Euclid</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>Euclid needs accessibility access to monitor keyboard events for hotkey detection.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSInputMonitoringUsageDescription</key>
+	<string>Euclid needs Input Monitoring permission so your global hotkey works in every app.</string>
+</dict>
+</plist>

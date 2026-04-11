@@ -1,6 +1,6 @@
-# GitHub Actions Workflows for Hex
+# GitHub Actions Workflows for Euclid
 
-This directory contains the CI/CD workflows for the Hex project.
+This directory contains the CI/CD workflows for the Euclid project.
 
 ## Workflows
 

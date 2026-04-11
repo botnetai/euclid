@@ -1,7 +1,7 @@
 {
-  "name": "hex-app",
+  "name": "euclid-app",
   "version": "0.7.3",
-  "description": "Release metadata + changelog automation for the Hex macOS app.",
+  "description": "Release metadata + changelog automation for the Euclid macOS app.",
   "private": true,
   "license": "MIT",
   "type": "module",

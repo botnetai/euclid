@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+---
+# Euclid Overview
+
+Euclid is a macOS app that allows you to transcribe your voice into text with a global hotkey. 
+Euclid will paste the transcription into your current app.
+
+
+- Swift Composable Architecture
+- Swift 6
+- Swift Async/Await
