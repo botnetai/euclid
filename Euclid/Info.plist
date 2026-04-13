@@ -25,5 +25,7 @@
 	</dict>
 	<key>NSInputMonitoringUsageDescription</key>
 	<string>Euclid needs Input Monitoring permission so your global hotkey works in every app.</string>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/botnetai/euclid/main/appcast.xml</string>
 </dict>
 </plist>

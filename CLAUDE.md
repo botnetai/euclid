@@ -42,7 +42,7 @@ The app uses **The Composable Architecture (TCA)** for state management. Key arc
 - **WhisperKit**: Core ML transcription (tracking main branch)
 - **FluidAudio (Parakeet)**: Core ML ASR (multilingual) default model
 - **Sauce**: Keyboard event monitoring
-- **Sparkle**: Auto-updates (feed: https://euclid-updates.s3.amazonaws.com/appcast.xml)
+- **Sparkle**: Auto-updates (feed: https://raw.githubusercontent.com/botnetai/euclid/main/appcast.xml)
 - **Swift Composable Architecture**: State management
 - **Inject** Hot Reloading for SwiftUI
 
@@ -142,22 +142,16 @@ FluidAudio models reside under `Application Support/FluidAudio/Models`.
 
 ## Releasing a New Version
 
-Releases are automated via a local CLI tool that handles building, signing, notarizing, and uploading.
+Releases are automated via a local CLI tool that handles building, signing, notarizing, and publishing through GitHub.
 
 ### Prerequisites
 
-1. **AWS credentials** must be set (for S3 uploads):
-   ```bash
-   export AWS_ACCESS_KEY_ID=...
-   export AWS_SECRET_ACCESS_KEY=...
-   ```
-
-2. **Notarization credentials** stored in keychain (one-time setup):
+1. **Notarization credentials** stored in keychain (one-time setup):
    ```bash
    xcrun notarytool store-credentials "AC_PASSWORD"
    ```
 
-3. **Dependencies installed** at project root and in tools:
+2. **Dependencies installed** at project root and in tools:
    ```bash
    bun install                # project root (for changesets)
    cd tools && bun install    # tools dependencies
@@ -190,7 +184,7 @@ Releases are automated via a local CLI tool that handles building, signing, nota
 9. Creates and signs DMG
 10. Notarizes DMG
 11. Generates Sparkle appcast
-12. Uploads to S3 (versioned DMG + `euclid-latest.dmg` + appcast.xml)
+12. Uploads DMG/ZIP artifacts to GitHub Releases and updates the repo-hosted `appcast.xml`
 13. Commits version changes, creates git tag, pushes
 14. Creates GitHub release with DMG and ZIP attachments
 
@@ -212,5 +206,5 @@ Each release produces:
 
 - **"Working tree is not clean"**: Commit or stash all changes before releasing
 - **Notarization fails**: Check Apple ID credentials and app-specific password
-- **S3 upload fails**: Verify AWS credentials and bucket permissions
+- **GitHub publish fails**: Verify the GitHub token/CLI auth and release permissions
 - **Build fails**: Ensure Xcode 16+ and valid code signing certificates

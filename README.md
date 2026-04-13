@@ -2,7 +2,7 @@
 
 Press-and-hold a hotkey to transcribe your voice and paste the result wherever you're typing.
 
-**[Download Euclid for macOS](https://euclid-updates.s3.us-east-1.amazonaws.com/euclid-latest.dmg)**
+**[Download Euclid for macOS](https://github.com/botnetai/euclid/releases)**
 
 > **Note:** Euclid is currently only available for **Apple Silicon** Macs.
 

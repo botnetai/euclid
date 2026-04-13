@@ -6,8 +6,8 @@ Releases are triggered by pushing git tags. The system automatically:
 - Builds & signs the app
 - Notarizes with Apple
 - Creates DMG + ZIP artifacts
-- Uploads to S3 for Sparkle updates
-- Creates GitHub release
+- Publishes artifacts to GitHub Releases
+- Updates the GitHub-hosted Sparkle appcast
 
 ## Quick Start
 
@@ -19,8 +19,8 @@ git push origin v0.2.12
 # GitHub Actions will automatically:
 # 1. Build Euclid v0.2.12
 # 2. Notarize with Apple
-# 3. Upload to S3 (Sparkle)
-# 4. Create GitHub release with DMG + ZIP
+# 3. Create/update the GitHub release with DMG + ZIP
+# 4. Refresh appcast.xml in the repository
 ```
 
 ## Architecture
@@ -33,12 +33,9 @@ git push origin v0.2.12
 **Effect Config system:**
 ```typescript
 // Reads from environment variables
-BUCKET=euclid-updates              // Default
 VERSION=v0.2.12                  // From git tag
 APPLE_ID=your@email.com         // CI only
 APPLE_ID_PASSWORD=xxxx-xxxx     // CI only
-AWS_ACCESS_KEY_ID=...           // Required
-AWS_SECRET_ACCESS_KEY=...       // Required
 ```
 
 **Local vs CI:**
@@ -51,11 +48,9 @@ AWS_SECRET_ACCESS_KEY=...       // Required
 # Setup keychain profile (one-time)
 xcrun notarytool store-credentials "AC_PASSWORD"
 
-# Test release locally (doesn't upload)
+# Test release locally (doesn't publish)
 cd tools
 VERSION=v0.2.12-test \
-  AWS_ACCESS_KEY_ID=... \
-  AWS_SECRET_ACCESS_KEY=... \
   bun run release.ts
 ```
 
@@ -76,19 +71,12 @@ MACOS_CERTIFICATE          # base64 -i cert.p12 | pbcopy
 MACOS_CERTIFICATE_PWD      # Certificate password
 ```
 
-### AWS (S3 / Sparkle)
-```bash
-AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY
-```
-
 ## Artifacts
 
 Each release creates:
 - `Euclid-{version}.dmg` - Signed, notarized DMG
 - `Euclid-{version}.zip` - For Homebrew cask
-- `euclid-latest.dmg` - Always points to latest
-- `appcast.xml` - Sparkle update feed
+- `appcast.xml` - Sparkle update feed committed to the repository and served from GitHub
 
 ## Homebrew Cask
 
@@ -121,7 +109,7 @@ If you accidentally create a release with a duplicate CFBundleVersion:
 1. Delete the problematic DMG from `updates/`
 2. Move any other old DMGs to `updates/old_updates/`
 3. Regenerate appcast: `./bin/generate_appcast --maximum-deltas 3 updates`
-4. Re-upload cleaned artifacts to S3
+4. Re-publish cleaned artifacts to GitHub Releases and commit the regenerated `appcast.xml`
 
 ## Troubleshooting
 
@@ -130,10 +118,10 @@ If you accidentally create a release with a duplicate CFBundleVersion:
 - Verify app-specific password
 - Ensure `TEAM_ID` is correct
 
-### S3 upload fails
-- Verify AWS credentials
-- Check bucket permissions
-- Ensure bucket exists
+### GitHub publish fails
+- Verify `gh auth status`
+- Check release permissions for the token or workflow
+- Confirm the target repository exists and is reachable
 
 ### Build fails
 - Check Xcode version (16.2)
@@ -144,7 +132,7 @@ If you accidentally create a release with a duplicate CFBundleVersion:
 - Verify appcast.xml lists versions in descending CFBundleVersion order
 - Check that CFBundleVersion values are unique and strictly increasing
 - Ensure no duplicate build numbers exist in updates/
-- Test feed URL: https://euclid-updates.s3.amazonaws.com/appcast.xml
+- Test feed URL: https://raw.githubusercontent.com/botnetai/euclid/main/appcast.xml
 
 ## Files
 
