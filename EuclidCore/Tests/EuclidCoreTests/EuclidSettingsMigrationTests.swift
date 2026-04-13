@@ -38,6 +38,20 @@ final class EuclidSettingsMigrationTests: XCTestCase {
 		XCTAssertEqual(decoded, settings)
 	}
 
+	func testEncodeDecodeRoundTripPreservesVocabularyTerms() throws {
+		let settings = EuclidSettings(
+			vocabularyTerms: [
+				VocabularyTerm(term: "OpenAI"),
+				VocabularyTerm(isEnabled: false, term: "Euclid")
+			]
+		)
+
+		let data = try JSONEncoder().encode(settings)
+		let decoded = try JSONDecoder().decode(EuclidSettings.self, from: data)
+
+		XCTAssertEqual(decoded.vocabularyTerms, settings.vocabularyTerms)
+	}
+
 	func testLegacyRecordingIndicatorStyleNamesDecodeToCurrentStyles() throws {
 		let legacyPairs: [(String, RecordingIndicatorStyle)] = [
 			("underneathNotch", .notch),

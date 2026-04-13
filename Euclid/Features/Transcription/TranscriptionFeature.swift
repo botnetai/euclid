@@ -402,6 +402,7 @@ private extension TranscriptionFeature {
     state.error = nil
     let model = state.euclidSettings.selectedModel
     let language = state.euclidSettings.outputLanguage
+    let vocabularyTerms = state.euclidSettings.vocabularyTerms
 
     return .run { [sleepManagement] send in
       // Allow system to sleep again
@@ -422,7 +423,7 @@ private extension TranscriptionFeature {
           chunkingStrategy: .vad,
         )
         
-        let result = try await transcription.transcribe(capturedURL, model, decodeOptions) { _ in }
+        let result = try await transcription.transcribe(capturedURL, model, decodeOptions, vocabularyTerms) { _ in }
         
         transcriptionFeatureLogger.notice("Transcribed audio from \(capturedURL.lastPathComponent) to text length \(result.count)")
         await send(.transcriptionResult(result, capturedURL))

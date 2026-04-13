@@ -98,6 +98,7 @@ struct SettingsFeature {
     case requestMicrophone
     case requestAccessibility
     case requestInputMonitoring
+    case openMicrophoneSettings
     case openAccessibilitySettings
     case openInputMonitoringSettings
 
@@ -123,6 +124,9 @@ struct SettingsFeature {
     case addWordRemapping
     case updateWordRemapping(WordRemapping)
     case removeWordRemapping(UUID)
+    case addVocabularyTerm
+    case updateVocabularyTerm(VocabularyTerm)
+    case removeVocabularyTerm(UUID)
     case setRemappingScratchpadFocused(Bool)
   }
 
@@ -477,6 +481,25 @@ struct SettingsFeature {
         }
         return .none
 
+      case .addVocabularyTerm:
+        state.$euclidSettings.withLock {
+          $0.vocabularyTerms.append(.init(term: ""))
+        }
+        return .none
+
+      case let .updateVocabularyTerm(term):
+        state.$euclidSettings.withLock {
+          guard let index = $0.vocabularyTerms.firstIndex(where: { $0.id == term.id }) else { return }
+          $0.vocabularyTerms[index] = term
+        }
+        return .none
+
+      case let .removeVocabularyTerm(id):
+        state.$euclidSettings.withLock {
+          $0.vocabularyTerms.removeAll { $0.id == id }
+        }
+        return .none
+
       case let .setRemappingScratchpadFocused(isFocused):
         state.$isRemappingScratchpadFocused.withLock { $0 = isFocused }
         return .none
@@ -598,6 +621,12 @@ struct SettingsFeature {
 
       case .requestInputMonitoring:
         return .none
+
+      case .openMicrophoneSettings:
+        settingsLogger.info("User opened microphone settings from settings")
+        return .run { _ in
+          await permissions.openMicrophoneSettings()
+        }
 
       case .openAccessibilitySettings:
         settingsLogger.info("User opened accessibility settings from settings")

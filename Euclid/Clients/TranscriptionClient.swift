@@ -22,7 +22,7 @@ private let parakeetLogger = EuclidLog.parakeet
 struct TranscriptionClient {
   /// Transcribes an audio file at the specified `URL` using the named `model`.
   /// Reports transcription progress via `progressCallback`.
-  var transcribe: @Sendable (URL, String, DecodingOptions, @escaping (Progress) -> Void) async throws -> String
+  var transcribe: @Sendable (URL, String, DecodingOptions, [VocabularyTerm], @escaping (Progress) -> Void) async throws -> String
 
   /// Ensures a model is downloaded (if missing) and loaded into memory, reporting progress via `progressCallback`.
   var downloadModel: @Sendable (String, @escaping (Progress) -> Void) async throws -> Void
@@ -47,7 +47,7 @@ extension TranscriptionClient: DependencyKey {
   static var liveValue: Self {
     let live = TranscriptionClientLive()
     return Self(
-      transcribe: { try await live.transcribe(url: $0, model: $1, options: $2, progressCallback: $3) },
+      transcribe: { try await live.transcribe(url: $0, model: $1, options: $2, vocabularyTerms: $3, progressCallback: $4) },
       downloadModel: { try await live.downloadAndLoadModel(variant: $0, progressCallback: $1) },
       deleteModel: { try await live.deleteModel(variant: $0) },
       isModelDownloaded: { await live.isModelDownloaded($0) },
@@ -245,6 +245,7 @@ actor TranscriptionClientLive {
     url: URL,
     model: String,
     options: DecodingOptions,
+    vocabularyTerms: [VocabularyTerm],
     progressCallback: @escaping (Progress) -> Void
   ) async throws -> String {
     let startAll = Date()
@@ -258,6 +259,9 @@ actor TranscriptionClientLive {
       let preparedClip = try ParakeetClipPreparer.ensureMinimumDuration(url: url, logger: parakeetLogger)
       defer { preparedClip.cleanup() }
       let startTx = Date()
+      if !enabledVocabularyTerms(from: vocabularyTerms).isEmpty {
+        transcriptionLogger.debug("Ignoring vocabulary bias for Parakeet model=\(model)")
+      }
       let text = try await parakeet.transcribe(preparedClip.url)
       transcriptionLogger.info("Parakeet transcription took \(String(format: "%.2f", Date().timeIntervalSince(startTx)))s")
       transcriptionLogger.info("Parakeet request total elapsed \(String(format: "%.2f", Date().timeIntervalSince(startAll)))s")
@@ -289,7 +293,14 @@ actor TranscriptionClientLive {
     // Perform the transcription.
     transcriptionLogger.notice("Transcribing with WhisperKit model=\(model) file=\(url.lastPathComponent)")
     let startTx = Date()
-    let results = try await whisperKit.transcribe(audioPath: url.path, decodeOptions: options)
+    var decodeOptions = options
+    let enabledVocabularyTermCount = enabledVocabularyTerms(from: vocabularyTerms).count
+    if let promptTokens = vocabularyPromptTokens(from: vocabularyTerms, tokenizer: whisperKit.tokenizer) {
+      decodeOptions.promptTokens = promptTokens
+      transcriptionLogger.info("Applied \(enabledVocabularyTermCount) vocabulary term(s) to Whisper prompt")
+    }
+
+    let results = try await whisperKit.transcribe(audioPath: url.path, decodeOptions: decodeOptions)
     transcriptionLogger.info("WhisperKit transcription took \(String(format: "%.2f", Date().timeIntervalSince(startTx)))s")
     transcriptionLogger.info("WhisperKit request total elapsed \(String(format: "%.2f", Date().timeIntervalSince(startAll)))s")
 
@@ -319,6 +330,25 @@ actor TranscriptionClientLive {
 
   private func isParakeet(_ name: String) -> Bool {
     ParakeetModel(rawValue: name) != nil
+  }
+
+  private func enabledVocabularyTerms(from vocabularyTerms: [VocabularyTerm]) -> [String] {
+    vocabularyTerms
+      .filter(\.isEnabled)
+      .map { $0.term.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+  }
+
+  private func vocabularyPromptTokens(
+    from vocabularyTerms: [VocabularyTerm],
+    tokenizer: WhisperTokenizer?
+  ) -> [Int]? {
+    guard let tokenizer else { return nil }
+    let terms = Array(NSOrderedSet(array: enabledVocabularyTerms(from: vocabularyTerms))) as? [String] ?? []
+    guard !terms.isEmpty else { return nil }
+    return tokenizer
+      .encode(text: " " + terms.joined(separator: ", "))
+      .filter { $0 < tokenizer.specialTokens.specialTokenBegin }
   }
 
   /// Creates or returns the local folder (on disk) for a given `variant` model.

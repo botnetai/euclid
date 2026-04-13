@@ -6,25 +6,27 @@ import SwiftUI
 struct WordRemappingsView: View {
 	@ObserveInjection var inject
 	@Bindable var store: StoreOf<SettingsFeature>
+	let isRecording: Bool
+	let isTranscribing: Bool
+	let onRecordSample: () -> Void
 	@FocusState private var isScratchpadFocused: Bool
-	@State private var activeSection: ModificationSection = .removals
 
 	var body: some View {
 		ScrollView {
 			VStack(alignment: .leading, spacing: 16) {
 				VStack(alignment: .leading, spacing: 6) {
-					Text("Transcript Modifications")
+					Text("Dictionary")
 						.font(.title2.bold())
-					Text("Remove or replace words in every transcript. Removals use regex patterns and match whole words.")
+					Text("Map phrases, remove filler words, and bias preferred spellings during transcription.")
 						.font(.callout)
 						.foregroundStyle(.secondary)
 				}
 
 				GroupBox {
 					VStack(alignment: .leading, spacing: 10) {
-						HStack(spacing: 12) {
+						HStack(alignment: .bottom, spacing: 12) {
 							VStack(alignment: .leading, spacing: 4) {
-								Text("Scratchpad")
+								Text("Sample")
 									.font(.caption.weight(.semibold))
 									.foregroundStyle(.secondary)
 								TextField("Say something…", text: $store.remappingScratchpadText)
@@ -35,39 +37,41 @@ struct WordRemappingsView: View {
 									}
 							}
 
-							VStack(alignment: .leading, spacing: 4) {
-								Text("Preview")
-									.font(.caption.weight(.semibold))
-									.foregroundStyle(.secondary)
-								Text(previewText.isEmpty ? "—" : previewText)
-									.font(.body)
-									.frame(maxWidth: .infinity, alignment: .leading)
-									.padding(.horizontal, 8)
-									.padding(.vertical, 6)
-									.background(
-										RoundedRectangle(cornerRadius: 6)
-											.fill(Color(nsColor: .controlBackgroundColor))
-									)
+							Button {
+								isScratchpadFocused = true
+								store.send(.setRemappingScratchpadFocused(true))
+								onRecordSample()
+							} label: {
+								Label(
+									isRecording ? "Stop" : "Record",
+									systemImage: isRecording ? "stop.circle.fill" : "mic.circle.fill"
+								)
 							}
+							.buttonStyle(.borderedProminent)
+							.disabled(isTranscribing && !isRecording)
+						}
+
+						VStack(alignment: .leading, spacing: 4) {
+							Text("Preview")
+								.font(.caption.weight(.semibold))
+								.foregroundStyle(.secondary)
+							Text(previewText.isEmpty ? "—" : previewText)
+								.font(.body)
+								.frame(maxWidth: .infinity, alignment: .leading)
+								.padding(.horizontal, 8)
+								.padding(.vertical, 6)
+								.background(
+									RoundedRectangle(cornerRadius: 6)
+										.fill(Color(nsColor: .controlBackgroundColor))
+								)
 						}
 					}
 					.padding(.vertical, 6)
 				}
 
-				Picker("Modification Type", selection: $activeSection) {
-					ForEach(ModificationSection.allCases) { section in
-						Text(section.title).tag(section)
-					}
-				}
-				.pickerStyle(.segmented)
-				.labelsHidden()
-
-				switch activeSection {
-				case .removals:
-					removalsSection
-				case .remappings:
-					remappingsSection
-				}
+				remappingsSection
+				removalsSection
+				vocabularySection
 			}
 			.frame(maxWidth: .infinity, alignment: .leading)
 			.padding()
@@ -114,7 +118,7 @@ struct WordRemappingsView: View {
 			.padding(.vertical, 4)
 		} label: {
 			VStack(alignment: .leading, spacing: 4) {
-				Text("Word Removals")
+				Text("Removals")
 					.font(.headline)
 				Text("Remove filler words using case-insensitive regex patterns.")
 					.settingsCaption()
@@ -141,7 +145,7 @@ struct WordRemappingsView: View {
 					Button {
 						store.send(.addWordRemapping)
 					} label: {
-						Label("Add Remapping", systemImage: "plus")
+						Label("Add Mapping", systemImage: "plus")
 					}
 					Spacer()
 				}
@@ -149,9 +153,44 @@ struct WordRemappingsView: View {
 			.padding(.vertical, 4)
 		} label: {
 			VStack(alignment: .leading, spacing: 4) {
-				Text("Word Remappings")
+				Text("Mappings")
 					.font(.headline)
 				Text("Replace specific words in every transcript. Matches whole words, case-insensitive, in order.")
+					.settingsCaption()
+			}
+		}
+	}
+
+	private var vocabularySection: some View {
+		GroupBox {
+			VStack(alignment: .leading, spacing: 10) {
+				vocabularyColumnHeaders
+
+				LazyVStack(alignment: .leading, spacing: 6) {
+					ForEach(store.euclidSettings.vocabularyTerms) { term in
+						if let vocabularyBinding = vocabularyBinding(for: term.id) {
+							VocabularyRow(vocabularyTerm: vocabularyBinding) {
+								store.send(.removeVocabularyTerm(term.id))
+							}
+						}
+					}
+				}
+
+				HStack {
+					Button {
+						store.send(.addVocabularyTerm)
+					} label: {
+						Label("Add Term", systemImage: "plus")
+					}
+					Spacer()
+				}
+			}
+			.padding(.vertical, 4)
+		} label: {
+			VStack(alignment: .leading, spacing: 4) {
+				Text("Vocabulary")
+					.font(.headline)
+				Text("Bias preferred spellings during transcription on supported models.")
 					.settingsCaption()
 			}
 		}
@@ -189,6 +228,19 @@ struct WordRemappingsView: View {
 		.padding(.horizontal, Layout.rowHorizontalPadding)
 	}
 
+	private var vocabularyColumnHeaders: some View {
+		HStack(spacing: 8) {
+			Text("On")
+				.frame(width: Layout.toggleColumnWidth, alignment: .leading)
+			Text("Term")
+				.frame(maxWidth: .infinity, alignment: .leading)
+			Spacer().frame(width: Layout.deleteColumnWidth)
+		}
+		.font(.caption)
+		.foregroundStyle(.secondary)
+		.padding(.horizontal, Layout.rowHorizontalPadding)
+	}
+
 	private func removalBinding(for id: UUID) -> Binding<WordRemoval>? {
 		guard let index = store.euclidSettings.wordRemovals.firstIndex(where: { $0.id == id }) else {
 			return nil
@@ -206,6 +258,16 @@ struct WordRemappingsView: View {
 		return Binding(
 			get: { store.euclidSettings.wordRemappings[index] },
 			set: { store.send(.updateWordRemapping($0)) }
+		)
+	}
+
+	private func vocabularyBinding(for id: UUID) -> Binding<VocabularyTerm>? {
+		guard let index = store.euclidSettings.vocabularyTerms.firstIndex(where: { $0.id == id }) else {
+			return nil
+		}
+		return Binding(
+			get: { store.euclidSettings.vocabularyTerms[index] },
+			set: { store.send(.updateVocabularyTerm($0)) }
 		)
 	}
 
@@ -288,19 +350,33 @@ private struct RemappingRow: View {
 	}
 }
 
-private enum ModificationSection: String, CaseIterable, Identifiable {
-	case removals
-	case remappings
+private struct VocabularyRow: View {
+	@Binding var vocabularyTerm: VocabularyTerm
+	var onDelete: () -> Void
 
-	var id: String { rawValue }
+	var body: some View {
+		HStack(spacing: 8) {
+			Toggle("", isOn: $vocabularyTerm.isEnabled)
+				.labelsHidden()
+				.toggleStyle(.checkbox)
+				.frame(width: Layout.toggleColumnWidth, alignment: .leading)
 
-	var title: String {
-		switch self {
-		case .removals:
-			return "Word Removals"
-		case .remappings:
-			return "Word Remappings"
+			TextField("Preferred spelling", text: $vocabularyTerm.term)
+				.textFieldStyle(.roundedBorder)
+
+			Button(role: .destructive, action: onDelete) {
+				Image(systemName: "trash")
+			}
+			.buttonStyle(.borderless)
+			.frame(width: Layout.deleteColumnWidth)
 		}
+		.padding(.horizontal, Layout.rowHorizontalPadding)
+		.padding(.vertical, Layout.rowVerticalPadding)
+		.frame(maxWidth: .infinity)
+		.background(
+			RoundedRectangle(cornerRadius: Layout.rowCornerRadius)
+				.fill(Color(nsColor: .controlBackgroundColor))
+		)
 	}
 }
 

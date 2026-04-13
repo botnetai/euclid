@@ -105,6 +105,7 @@ public struct EuclidSettings: Codable, Equatable, Sendable {
 	public var wordRemovalsEnabled: Bool
 	public var wordRemovals: [WordRemoval]
 	public var wordRemappings: [WordRemapping]
+	public var vocabularyTerms: [VocabularyTerm]
 
 	private mutating func normalizeDoubleTapSettings() {
 		if !doubleTapLockEnabled {
@@ -196,7 +197,8 @@ public struct EuclidSettings: Codable, Equatable, Sendable {
 		hasCompletedStorageMigration: Bool = false,
 		wordRemovalsEnabled: Bool = false,
 		wordRemovals: [WordRemoval] = EuclidSettings.defaultWordRemovals,
-		wordRemappings: [WordRemapping] = []
+		wordRemappings: [WordRemapping] = [],
+		vocabularyTerms: [VocabularyTerm] = []
 	) {
 		self.soundEffectsEnabled = soundEffectsEnabled
 		self.soundEffectsVolume = soundEffectsVolume
@@ -225,6 +227,7 @@ public struct EuclidSettings: Codable, Equatable, Sendable {
 		self.wordRemovalsEnabled = wordRemovalsEnabled
 		self.wordRemovals = wordRemovals
 		self.wordRemappings = wordRemappings
+		self.vocabularyTerms = vocabularyTerms
 		normalizeRecordingHotkeys()
 		normalizeDoubleTapSettings()
 	}
@@ -277,6 +280,7 @@ private enum EuclidSettingKey: String, CodingKey, CaseIterable {
 	case wordRemovalsEnabled
 	case wordRemovals
 	case wordRemappings
+	case vocabularyTerms
 }
 
 private struct SettingsField<Value: Codable & Sendable> {
@@ -424,6 +428,11 @@ private enum EuclidSettingsSchema {
 			.wordRemappings,
 			keyPath: \.wordRemappings,
 			default: defaults.wordRemappings
+		).eraseToAny(),
+		SettingsField(
+			.vocabularyTerms,
+			keyPath: \.vocabularyTerms,
+			default: defaults.vocabularyTerms
 		).eraseToAny()
 	]
 }

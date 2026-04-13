@@ -12,133 +12,122 @@ struct PermissionsSectionView: View {
 
 	var body: some View {
 		Section {
-			HStack(spacing: 12) {
-				// Microphone
-				permissionCard(
-					title: "Microphone",
+			VStack(alignment: .leading, spacing: 10) {
+				Text("Grant the remaining permissions so Euclid can record, listen for your hotkey, and paste into the active app.")
+					.font(.callout)
+					.foregroundStyle(.secondary)
+					.fixedSize(horizontal: false, vertical: true)
+
+				Text("Euclid only listens while you hold the hotkey.")
+					.font(.caption)
+					.foregroundStyle(.green)
+
+				PermissionChecklistRow(
 					icon: "mic.fill",
+					iconColor: .orange,
+					title: "Microphone",
+					subtitle: microphoneSubtitle,
 					status: microphonePermission,
-					action: { store.send(.requestMicrophone) }
+					primaryAction: microphonePrimaryAction
 				)
 
-				permissionCard(
-					title: "Accessibility",
+				PermissionChecklistRow(
 					icon: "accessibility",
+					iconColor: .orange,
+					title: "Accessibility",
+					subtitle: accessibilitySubtitle,
 					status: accessibilityPermission,
-					action: { store.send(.requestAccessibility) }
+					primaryAction: accessibilityPrimaryAction,
+					secondaryAction: openAccessibilitySettingsAction
 				)
 
-				permissionCard(
-					title: "Input Monitoring",
+				PermissionChecklistRow(
 					icon: "keyboard",
+					iconColor: .orange,
+					title: "Input Monitoring",
+					subtitle: inputMonitoringSubtitle,
 					status: inputMonitoringPermission,
-					action: { store.send(.requestInputMonitoring) }
+					primaryAction: inputMonitoringPrimaryAction,
+					secondaryAction: openInputMonitoringSettingsAction
 				)
 			}
-
-			if accessibilityPermission != .granted {
-				VStack(alignment: .leading, spacing: 8) {
-					Label {
-						Text("Grant Accessibility first. Euclid should appear in the Accessibility list after macOS shows the prompt.")
-							.font(.callout)
-							.foregroundStyle(.primary)
-					} icon: {
-						Image(systemName: "figure.wave")
-							.foregroundStyle(.yellow)
-					}
-
-					Button("Open Accessibility Settings") {
-						store.send(.openAccessibilitySettings)
-					}
-					.buttonStyle(.bordered)
-					.controlSize(.small)
-				}
-				.padding(12)
-				.background(Color(nsColor: .controlBackgroundColor))
-				.clipShape(RoundedRectangle(cornerRadius: 10))
-			}
-
-			if inputMonitoringPermission != .granted {
-				VStack(alignment: .leading, spacing: 8) {
-					Label {
-						Text(inputMonitoringHelpText)
-							.font(.callout)
-							.foregroundStyle(.primary)
-					} icon: {
-						Image(systemName: "exclamationmark.triangle.fill")
-							.foregroundStyle(.yellow)
-					}
-
-					HStack(spacing: 8) {
-						Button("Retry Input Monitoring Prompt") {
-							store.send(.requestInputMonitoring)
-						}
-						.buttonStyle(.borderedProminent)
-						.controlSize(.small)
-
-						Button("Open Input Monitoring Settings") {
-							store.send(.openInputMonitoringSettings)
-						}
-						.buttonStyle(.bordered)
-						.controlSize(.small)
-					}
-				}
-				.padding(12)
-				.background(Color(nsColor: .controlBackgroundColor))
-				.clipShape(RoundedRectangle(cornerRadius: 10))
-			}
-
 		} header: {
 			Text("Permissions")
 		}
 		.enableInjection()
 	}
-	
-	@ViewBuilder
-	private func permissionCard(
-		title: String,
-		icon: String,
-		status: PermissionStatus,
-		action: @escaping () -> Void
-	) -> some View {
-		HStack(spacing: 8) {
-			Image(systemName: icon)
-				.font(.body)
-				.foregroundStyle(.secondary)
-				.frame(width: 16)
-			
-			Text(title)
-				.font(.body.weight(.medium))
-				.lineLimit(1)
-				.truncationMode(.tail)
-				.layoutPriority(1)
-			
-			Spacer()
-			
-			switch status {
-			case .granted:
-				Image(systemName: "checkmark.circle.fill")
-					.foregroundStyle(.green)
-					.font(.body)
-			case .denied, .notDetermined:
-				Button("Grant") {
-					action()
-				}
-				.buttonStyle(.bordered)
-				.controlSize(.small)
-			}
+
+	private var microphoneSubtitle: String? {
+		guard microphonePermission != .granted else { return nil }
+		if microphonePermission == .denied {
+			return "Enable Euclid in System Settings to record"
 		}
-		.padding(.horizontal, 12)
-		.padding(.vertical, 8)
-		.frame(maxWidth: .infinity)
-		.background(Color(nsColor: .controlBackgroundColor))
-		.clipShape(RoundedRectangle(cornerRadius: 8))
+		return "Used only while you are recording"
 	}
 
-	private var inputMonitoringHelpText: String {
-		if accessibilityPermission != .granted {
-			return "After Accessibility is granted: 1. Click Retry Input Monitoring Prompt. 2. Open Input Monitoring Settings. 3. Enable Euclid there if it appears."
+	private var accessibilitySubtitle: String? {
+		guard accessibilityPermission != .granted else { return nil }
+		if accessibilityPermission == .denied {
+			return "Grant the prompt, then enable Euclid in Privacy & Security"
 		}
-		return "1. Click Retry Input Monitoring Prompt. 2. Open Input Monitoring Settings. 3. Enable Euclid there if it appears."
+		return "Lets Euclid paste back into the active app"
+	}
+
+	private var inputMonitoringSubtitle: String? {
+		guard inputMonitoringPermission != .granted else { return nil }
+		if inputMonitoringPermission == .denied {
+			return "Retry the prompt, then enable Euclid in Privacy & Security"
+		}
+		return "Required for your global hotkey"
+	}
+
+	private var microphonePrimaryAction: PermissionChecklistAction? {
+		guard microphonePermission != .granted else { return nil }
+		if microphonePermission == .denied {
+			return PermissionChecklistAction(
+				title: "Open Settings",
+				style: .primary,
+				action: { store.send(.openMicrophoneSettings) }
+			)
+		}
+		return PermissionChecklistAction(
+			title: "Grant",
+			style: .primary,
+			action: { store.send(.requestMicrophone) }
+		)
+	}
+
+	private var accessibilityPrimaryAction: PermissionChecklistAction? {
+		guard accessibilityPermission != .granted else { return nil }
+		return PermissionChecklistAction(
+			title: accessibilityPermission == .denied ? "Retry Prompt" : "Grant",
+			style: .primary,
+			action: { store.send(.requestAccessibility) }
+		)
+	}
+
+	private var inputMonitoringPrimaryAction: PermissionChecklistAction? {
+		guard inputMonitoringPermission != .granted else { return nil }
+		return PermissionChecklistAction(
+			title: inputMonitoringPermission == .denied ? "Retry Prompt" : "Grant",
+			style: .primary,
+			action: { store.send(.requestInputMonitoring) }
+		)
+	}
+
+	private var openAccessibilitySettingsAction: PermissionChecklistAction? {
+		guard accessibilityPermission != .granted else { return nil }
+		return PermissionChecklistAction(
+			title: "Open Settings",
+			action: { store.send(.openAccessibilitySettings) }
+		)
+	}
+
+	private var openInputMonitoringSettingsAction: PermissionChecklistAction? {
+		guard inputMonitoringPermission != .granted else { return nil }
+		return PermissionChecklistAction(
+			title: "Open Settings",
+			action: { store.send(.openInputMonitoringSettings) }
+		)
 	}
 }

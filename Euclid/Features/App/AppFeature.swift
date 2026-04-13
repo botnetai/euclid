@@ -33,6 +33,12 @@ struct AppFeature {
     var microphonePermission: PermissionStatus = .notDetermined
     var accessibilityPermission: PermissionStatus = .notDetermined
     var inputMonitoringPermission: PermissionStatus = .notDetermined
+
+    var allPermissionsGranted: Bool {
+      microphonePermission == .granted
+        && accessibilityPermission == .granted
+        && inputMonitoringPermission == .granted
+    }
   }
 
   enum Action: BindableAction {
@@ -40,6 +46,7 @@ struct AppFeature {
     case transcription(TranscriptionFeature.Action)
     case settings(SettingsFeature.Action)
     case history(HistoryFeature.Action)
+    case dictionarySampleRecordingTapped
     case setActiveTab(ActiveTab)
     case task
     case pasteLastTranscript
@@ -123,6 +130,18 @@ struct AppFeature {
 
       case .settings:
         return .none
+
+      case .dictionarySampleRecordingTapped:
+        if state.transcription.isRecording {
+          return .send(.transcription(.stopRecording))
+        }
+
+        guard !state.transcription.isTranscribing else {
+          return .none
+        }
+
+        let hotkey = state.euclidSettings.recordingHotkeys.first ?? state.euclidSettings.hotkey
+        return .send(.transcription(.startRecording(hotkey)))
 
       case .history(.navigateToSettings):
         state.activeTab = .settings
@@ -292,7 +311,7 @@ struct AppView: View {
         Button {
           store.send(.setActiveTab(.remappings))
         } label: {
-          Label("Transforms", systemImage: "text.badge.plus")
+          Label("Dictionary", systemImage: "text.badge.plus")
         }
         .buttonStyle(.plain)
         .tag(AppFeature.ActiveTab.remappings)
@@ -324,8 +343,13 @@ struct AppView: View {
         )
         .navigationTitle("Settings")
       case .remappings:
-        WordRemappingsView(store: store.scope(state: \.settings, action: \.settings))
-          .navigationTitle("Transforms")
+        WordRemappingsView(
+          store: store.scope(state: \.settings, action: \.settings),
+          isRecording: store.transcription.isRecording,
+          isTranscribing: store.transcription.isTranscribing,
+          onRecordSample: { store.send(.dictionarySampleRecordingTapped) }
+        )
+          .navigationTitle("Dictionary")
       case .history:
         HistoryView(store: store.scope(state: \.history, action: \.history))
           .navigationTitle("History")

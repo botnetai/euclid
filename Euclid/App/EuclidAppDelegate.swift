@@ -1,3 +1,4 @@
+import AVFoundation
 import ComposableArchitecture
 import EuclidCore
 import SwiftUI
@@ -10,9 +11,11 @@ class EuclidAppDelegate: NSObject, NSApplicationDelegate {
 	var settingsWindow: NSWindow?
 	var statusItem: NSStatusItem!
 	private var launchedAtLogin = false
+	private let setupPanel = SetupPanel()
 
 	@Dependency(\.soundEffects) var soundEffect
 	@Dependency(\.recording) var recording
+	@Dependency(\.permissions) var permissions
 	@Shared(.euclidSettings) var euclidSettings: EuclidSettings
 
 	func applicationDidFinishLaunching(_: Notification) {
@@ -49,12 +52,25 @@ class EuclidAppDelegate: NSObject, NSApplicationDelegate {
 		// Then present main views
 		presentMainView()
 
+		// Listen for setup completion to transition to settings
+		NotificationCenter.default.addObserver(
+			self,
+			selector: #selector(handleSetupCompleted),
+			name: .setupPanelCompleted,
+			object: nil
+		)
+
 		guard shouldOpenForegroundUIOnLaunch else {
 			appLogger.notice("Suppressing foreground windows for login launch")
 			return
 		}
 
-		presentSettingsView()
+		if needsPermissionSetup() {
+			appLogger.notice("Permissions incomplete — showing setup panel")
+			setupPanel.show(store: EuclidApp.appStore)
+		} else {
+			presentSettingsView()
+		}
 		NSApp.activate(ignoringOtherApps: true)
 	}
 
@@ -140,8 +156,27 @@ class EuclidAppDelegate: NSObject, NSApplicationDelegate {
 		}
 	}
 
-	func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows _: Bool) -> Bool {
+	@objc private func handleSetupCompleted() {
+		appLogger.notice("Setup completed — transitioning to settings")
+		setupPanel.dismiss()
 		presentSettingsView()
+		NSApp.activate(ignoringOtherApps: true)
+	}
+
+	/// Synchronous check of whether any required permission is missing.
+	private func needsPermissionSetup() -> Bool {
+		let micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+		let accGranted = permissions.accessibilityStatus() == .granted
+		let inputGranted = permissions.inputMonitoringStatus() == .granted
+		return !micGranted || !accGranted || !inputGranted
+	}
+
+	func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows _: Bool) -> Bool {
+		if needsPermissionSetup() && !setupPanel.isVisible {
+			setupPanel.show(store: EuclidApp.appStore)
+		} else {
+			presentSettingsView()
+		}
 		return true
 	}
 
