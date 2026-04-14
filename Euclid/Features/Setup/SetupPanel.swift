@@ -13,6 +13,7 @@ final class SetupPanel {
 
     func show(store: StoreOf<AppFeature>, onSetupComplete: @escaping () -> Void = {}) {
         if let existing = panel {
+            store.send(.startPermissionPolling)
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return

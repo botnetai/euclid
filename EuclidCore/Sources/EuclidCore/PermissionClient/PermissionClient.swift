@@ -82,7 +82,9 @@ public struct PermissionClient: Sendable {
   /// permissions when the app comes to the foreground.
   ///
   /// - Note: On macOS, the app is killed when permissions change in System Settings,
-  ///   so continuous polling is unnecessary. Checking on app activation is sufficient.
+  ///   but current macOS releases do not always terminate or reactivate the app in a
+  ///   way the permission flow can rely on. Observe activation and layer short polling
+  ///   windows after opening Settings or showing prompts.
   public var observeAppActivation: @Sendable () -> AsyncStream<AppActivation> = { .never }
 }
 

@@ -38,7 +38,7 @@ struct PermissionsSectionView: View {
 					subtitle: accessibilitySubtitle,
 					status: accessibilityPermission,
 					primaryAction: accessibilityPrimaryAction,
-					secondaryAction: openAccessibilitySettingsAction
+					secondaryAction: accessibilitySecondaryAction
 				)
 
 				PermissionChecklistRow(
@@ -48,7 +48,7 @@ struct PermissionsSectionView: View {
 					subtitle: inputMonitoringSubtitle,
 					status: inputMonitoringPermission,
 					primaryAction: inputMonitoringPrimaryAction,
-					secondaryAction: openInputMonitoringSettingsAction
+					secondaryAction: inputMonitoringSecondaryAction
 				)
 			}
 		} header: {
@@ -67,18 +67,12 @@ struct PermissionsSectionView: View {
 
 	private var accessibilitySubtitle: String? {
 		guard accessibilityPermission != .granted else { return nil }
-		if accessibilityPermission == .denied {
-			return "Grant the prompt, then enable Euclid in Privacy & Security"
-		}
-		return "Lets Euclid paste back into the active app"
+		return "Enable Euclid in Privacy & Security. If Euclid is missing there, click Show Prompt once."
 	}
 
 	private var inputMonitoringSubtitle: String? {
 		guard inputMonitoringPermission != .granted else { return nil }
-		if inputMonitoringPermission == .denied {
-			return "Retry the prompt, then enable Euclid in Privacy & Security"
-		}
-		return "Required for your global hotkey"
+		return "Enable Euclid in Privacy & Security. If Euclid is missing there, click Show Prompt once."
 	}
 
 	private var microphonePrimaryAction: PermissionChecklistAction? {
@@ -100,8 +94,16 @@ struct PermissionsSectionView: View {
 	private var accessibilityPrimaryAction: PermissionChecklistAction? {
 		guard accessibilityPermission != .granted else { return nil }
 		return PermissionChecklistAction(
-			title: accessibilityPermission == .denied ? "Retry Prompt" : "Grant",
+			title: "Open Settings",
 			style: .primary,
+			action: { store.send(.openAccessibilitySettings) }
+		)
+	}
+
+	private var accessibilitySecondaryAction: PermissionChecklistAction? {
+		guard accessibilityPermission != .granted else { return nil }
+		return PermissionChecklistAction(
+			title: "Show Prompt",
 			action: { store.send(.requestAccessibility) }
 		)
 	}
@@ -109,25 +111,17 @@ struct PermissionsSectionView: View {
 	private var inputMonitoringPrimaryAction: PermissionChecklistAction? {
 		guard inputMonitoringPermission != .granted else { return nil }
 		return PermissionChecklistAction(
-			title: inputMonitoringPermission == .denied ? "Retry Prompt" : "Grant",
-			style: .primary,
-			action: { store.send(.requestInputMonitoring) }
-		)
-	}
-
-	private var openAccessibilitySettingsAction: PermissionChecklistAction? {
-		guard accessibilityPermission != .granted else { return nil }
-		return PermissionChecklistAction(
 			title: "Open Settings",
-			action: { store.send(.openAccessibilitySettings) }
+			style: .primary,
+			action: { store.send(.openInputMonitoringSettings) }
 		)
 	}
 
-	private var openInputMonitoringSettingsAction: PermissionChecklistAction? {
+	private var inputMonitoringSecondaryAction: PermissionChecklistAction? {
 		guard inputMonitoringPermission != .granted else { return nil }
 		return PermissionChecklistAction(
-			title: "Open Settings",
-			action: { store.send(.openInputMonitoringSettings) }
+			title: "Show Prompt",
+			action: { store.send(.requestInputMonitoring) }
 		)
 	}
 }

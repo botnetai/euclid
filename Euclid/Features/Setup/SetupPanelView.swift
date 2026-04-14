@@ -86,7 +86,7 @@ struct SetupPanelView: View {
                         subtitle: accessibilitySubtitle,
                         status: store.accessibilityPermission,
                         primaryAction: accessibilityPrimaryAction,
-                        secondaryAction: openAccessibilitySettingsAction,
+                        secondaryAction: accessibilitySecondaryAction,
                         theme: .clickyPanel
                     )
 
@@ -97,7 +97,7 @@ struct SetupPanelView: View {
                         subtitle: inputMonitoringSubtitle,
                         status: store.inputMonitoringPermission,
                         primaryAction: inputMonitoringPrimaryAction,
-                        secondaryAction: openInputMonitoringSettingsAction,
+                        secondaryAction: inputMonitoringSecondaryAction,
                         theme: .clickyPanel
                     )
                 }
@@ -136,6 +136,12 @@ struct SetupPanelView: View {
                 .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onAppear {
+            store.send(.startPermissionPolling)
+            if allGranted {
+                onSetupComplete()
+            }
+        }
         .onChange(of: allGranted) { _, granted in
             if granted {
                 onSetupComplete()
@@ -173,18 +179,12 @@ struct SetupPanelView: View {
 
     private var accessibilitySubtitle: String? {
         guard store.accessibilityPermission != .granted else { return nil }
-        if store.accessibilityPermission == .denied {
-            return "Enable Euclid in Privacy & Security after the prompt"
-        }
-        return "Lets Euclid paste back into the active app"
+        return "Enable Euclid in Privacy & Security. If Euclid is missing there, click Show Prompt once."
     }
 
     private var inputMonitoringSubtitle: String? {
         guard store.inputMonitoringPermission != .granted else { return nil }
-        if store.inputMonitoringPermission == .denied {
-            return "Retry the prompt, then enable Euclid in System Settings"
-        }
-        return "Required for your global hotkey"
+        return "Enable Euclid in Privacy & Security. If Euclid is missing there, click Show Prompt once."
     }
 
     private var microphonePrimaryAction: PermissionChecklistAction? {
@@ -206,8 +206,16 @@ struct SetupPanelView: View {
     private var accessibilityPrimaryAction: PermissionChecklistAction? {
         guard store.accessibilityPermission != .granted else { return nil }
         return PermissionChecklistAction(
-            title: store.accessibilityPermission == .denied ? "Retry Prompt" : "Grant",
+            title: "Open Settings",
             style: .primary,
+            action: { store.send(.settings(.openAccessibilitySettings)) }
+        )
+    }
+
+    private var accessibilitySecondaryAction: PermissionChecklistAction? {
+        guard store.accessibilityPermission != .granted else { return nil }
+        return PermissionChecklistAction(
+            title: "Show Prompt",
             action: { store.send(.requestAccessibility) }
         )
     }
@@ -215,25 +223,17 @@ struct SetupPanelView: View {
     private var inputMonitoringPrimaryAction: PermissionChecklistAction? {
         guard store.inputMonitoringPermission != .granted else { return nil }
         return PermissionChecklistAction(
-            title: store.inputMonitoringPermission == .denied ? "Retry Prompt" : "Grant",
-            style: .primary,
-            action: { store.send(.requestInputMonitoring) }
-        )
-    }
-
-    private var openAccessibilitySettingsAction: PermissionChecklistAction? {
-        guard store.accessibilityPermission != .granted else { return nil }
-        return PermissionChecklistAction(
             title: "Open Settings",
-            action: { store.send(.settings(.openAccessibilitySettings)) }
+            style: .primary,
+            action: { store.send(.settings(.openInputMonitoringSettings)) }
         )
     }
 
-    private var openInputMonitoringSettingsAction: PermissionChecklistAction? {
+    private var inputMonitoringSecondaryAction: PermissionChecklistAction? {
         guard store.inputMonitoringPermission != .granted else { return nil }
         return PermissionChecklistAction(
-            title: "Open Settings",
-            action: { store.send(.settings(.openInputMonitoringSettings)) }
+            title: "Show Prompt",
+            action: { store.send(.requestInputMonitoring) }
         )
     }
 

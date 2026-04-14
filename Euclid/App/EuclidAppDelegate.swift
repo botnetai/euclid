@@ -56,13 +56,13 @@ class EuclidAppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 
+		presentSettingsView()
+
 		if needsPermissionSetup() {
 			appLogger.notice("Permissions incomplete — showing setup panel")
 			windowCoordinator.presentSetupPanel(store: EuclidApp.appStore) { [weak self] in
 				self?.presentSettingsView()
 			}
-		} else {
-			presentSettingsView()
 		}
 		NSApp.activate(ignoringOtherApps: true)
 	}
@@ -149,12 +149,12 @@ class EuclidAppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	func applicationShouldHandleReopen(_: NSApplication, hasVisibleWindows _: Bool) -> Bool {
+		presentSettingsView()
+
 		if needsPermissionSetup() && !windowCoordinator.isSetupVisible {
 			windowCoordinator.presentSetupPanel(store: EuclidApp.appStore) { [weak self] in
 				self?.presentSettingsView()
 			}
-		} else {
-			presentSettingsView()
 		}
 		return true
 	}

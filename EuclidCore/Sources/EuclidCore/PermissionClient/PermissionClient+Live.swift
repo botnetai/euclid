@@ -109,17 +109,24 @@ actor PermissionClientLive {
   // MARK: - Accessibility Permissions
 
   nonisolated func accessibilityStatus() -> PermissionStatus {
-    // Check without prompting (kAXTrustedCheckOptionPrompt: false)
-    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
-    let result = AXIsProcessTrustedWithOptions(options) ? PermissionStatus.granted : .denied
+    let trusted = AXIsProcessTrusted()
+    let result: PermissionStatus = trusted ? .granted : .denied
     logger.info("Accessibility status: \(String(describing: result))")
     return result
   }
 
   nonisolated func inputMonitoringStatus() -> PermissionStatus {
+    let preflightGranted = CGPreflightListenEventAccess()
     let access = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
-    let result = mapIOHIDAccess(access)
-    logger.info("Input monitoring status: \(String(describing: result)) (IOHIDAccess: \(String(describing: access)))")
+    let result: PermissionStatus
+    if preflightGranted || access == kIOHIDAccessTypeGranted {
+      result = .granted
+    } else if access == kIOHIDAccessTypeUnknown {
+      result = .notDetermined
+    } else {
+      result = .denied
+    }
+    logger.info("Input monitoring status: \(String(describing: result)) (CGPreflight: \(preflightGranted), IOHIDAccess: \(String(describing: access)))")
     return result
   }
 
@@ -140,15 +147,10 @@ actor PermissionClientLive {
       return true
     }
 
-    // On current macOS releases, creating the event tap is what reliably causes the
-    // app to appear in Input Monitoring. Directly jumping to Settings is confusing if
-    // the system has not registered the app yet.
-    await triggerInputMonitoringPrompt()
-
     let granted = await MainActor.run {
-      CGPreflightListenEventAccess()
+      CGRequestListenEventAccess()
     }
-    logger.info("Input monitoring permission granted after prompt attempt: \(granted)")
+    logger.info("Input monitoring permission granted after request: \(granted)")
     return granted
   }
 
@@ -185,41 +187,5 @@ actor PermissionClientLive {
     default:
       return .notDetermined
     }
-  }
-
-  @MainActor
-  private func triggerInputMonitoringPrompt() async {
-    let eventMask =
-      ((1 << CGEventType.keyDown.rawValue)
-       | (1 << CGEventType.keyUp.rawValue)
-       | (1 << CGEventType.flagsChanged.rawValue))
-
-    let callback: CGEventTapCallBack = { _, _, event, _ in
-      Unmanaged.passUnretained(event)
-    }
-
-    guard
-      let eventTap = CGEvent.tapCreate(
-        tap: .cghidEventTap,
-        place: .headInsertEventTap,
-        options: .defaultTap,
-        eventsOfInterest: CGEventMask(eventMask),
-        callback: callback,
-        userInfo: nil
-      )
-    else {
-      logger.notice("Temporary event tap could not be created while requesting Input Monitoring")
-      return
-    }
-
-    let runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
-    CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
-    CGEvent.tapEnable(tap: eventTap, enable: true)
-
-    // Give macOS a moment to present the consent UI/register the app.
-    try? await Task.sleep(for: .milliseconds(250))
-
-    CGEvent.tapEnable(tap: eventTap, enable: false)
-    CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
   }
 }

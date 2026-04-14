@@ -11,6 +11,13 @@ import Dependencies
 import EuclidCore
 import SwiftUI
 
+private enum PermissionPollingID {
+  case status
+}
+
+private let permissionPollingAttempts = 90
+private let permissionPollingInterval: Duration = .seconds(1)
+
 private final class AppRecordingHotKeyProcessorBox: @unchecked Sendable {
   private let lock = NSLock()
   private var processor: RecordingHotKeyProcessor
@@ -104,9 +111,11 @@ struct AppFeature {
     case openMicrophoneSettings
     case openAccessibilitySettings
     case openInputMonitoringSettings
+    case startPermissionPolling
     case modelStatusEvaluated(Bool)
   }
 
+  @Dependency(\.continuousClock) var clock
   @Dependency(\.keyEventMonitor) var keyEventMonitor
   @Dependency(\.pasteboard) var pasteboard
   @Dependency(\.transcription) var transcription
@@ -141,7 +150,8 @@ struct AppFeature {
           startGlobalInputMonitoring(),
           ensureSelectedModelReadiness(),
           prewarmSelectedModel(),
-          startPermissionMonitoring()
+          startPermissionMonitoring(),
+          .send(.startPermissionPolling)
         )
         
       case .pasteLastTranscript:
@@ -230,51 +240,63 @@ struct AppFeature {
         state.microphonePermission = mic
         state.accessibilityPermission = acc
         state.inputMonitoringPermission = input
+        if state.allPermissionsGranted {
+          return .cancel(id: PermissionPollingID.status)
+        }
         return .none
 
       case .appActivated:
-        // App became active - re-check permissions
-        return .send(.checkPermissions)
+        return .send(.startPermissionPolling)
 
       case .requestMicrophone:
         return .run { send in
           _ = await permissions.requestMicrophone()
-          await send(.checkPermissions)
+          await send(.startPermissionPolling)
         }
 
       case .requestAccessibility:
         return .run { send in
           await permissions.requestAccessibility()
-          // Poll for status change (macOS doesn't provide callback)
-          for _ in 0..<10 {
-            try? await Task.sleep(for: .seconds(1))
-            await send(.checkPermissions)
-          }
+          await send(.startPermissionPolling)
         }
 
       case .requestInputMonitoring:
         return .run { send in
           _ = await permissions.requestInputMonitoring()
-          for _ in 0..<10 {
-            try? await Task.sleep(for: .seconds(1))
-            await send(.checkPermissions)
-          }
+          await send(.startPermissionPolling)
         }
 
       case .openMicrophoneSettings:
-        return .run { _ in
+        return .run { send in
           await permissions.openMicrophoneSettings()
+          await send(.startPermissionPolling)
         }
 
       case .openAccessibilitySettings:
-        return .run { _ in
+        return .run { send in
           await permissions.openAccessibilitySettings()
+          await send(.startPermissionPolling)
         }
 
       case .openInputMonitoringSettings:
-        return .run { _ in
+        return .run { send in
           await permissions.openInputMonitoringSettings()
+          await send(.startPermissionPolling)
         }
+
+      case .startPermissionPolling:
+        return .run { [clock] send in
+          await send(.checkPermissions)
+
+          do {
+            for _ in 1..<permissionPollingAttempts {
+              try await clock.sleep(for: permissionPollingInterval)
+              await send(.checkPermissions)
+            }
+          } catch is CancellationError {
+          }
+        }
+        .cancellable(id: PermissionPollingID.status, cancelInFlight: true)
 
       case .modelStatusEvaluated:
         return .none
@@ -438,10 +460,6 @@ struct AppFeature {
 
   private func startPermissionMonitoring() -> Effect<Action> {
     .run { send in
-      // Initial check on app launch
-      await send(.checkPermissions)
-
-      // Monitor app activation events
       for await activation in permissions.observeAppActivation() {
         if case .didBecomeActive = activation {
           await send(.appActivated)
